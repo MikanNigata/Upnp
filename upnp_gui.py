@@ -2,6 +2,7 @@ import ipaddress
 import socket
 import threading
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
 from typing import Any
 
@@ -12,8 +13,9 @@ class UPnPToolGUI:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("UPnP ポート開放ツール")
-        self.root.geometry("760x720")
-        self.root.minsize(720, 620)
+        self.root.geometry("980x760")
+        self.root.minsize(860, 680)
+        self.root.configure(bg="#eef3f9")
 
         self.upnp = upnpy.UPnP()
         self.service = None
@@ -25,121 +27,324 @@ class UPnPToolGUI:
         self.status_var = tk.StringVar(value="UPnP デバイスを検出中...")
         self.external_ip_var = tk.StringVar(value="未取得")
         self.router_var = tk.StringVar()
+        self.router_info_var = tk.StringVar(value="未選択")
 
+        self.setup_styles()
         self.create_widgets()
         self.auto_fill_ip()
         self.start_discovery()
 
+    def setup_styles(self) -> None:
+        self.palette = {
+            "app_bg": "#eef3f9",
+            "card_bg": "#ffffff",
+            "border": "#d8e1ee",
+            "text": "#122033",
+            "muted": "#5b6b82",
+            "accent": "#2563eb",
+            "accent_hover": "#1d4ed8",
+            "danger": "#dc2626",
+            "success": "#15803d",
+            "log_bg": "#0f172a",
+            "log_fg": "#e5eefc",
+        }
+        self.font_family = "Yu Gothic UI"
+
+        try:
+            self.root.tk.call("tk", "scaling", 1.1)
+        except tk.TclError:
+            pass
+
+        for font_name, size, weight in (
+            ("TkDefaultFont", 10, "normal"),
+            ("TkTextFont", 10, "normal"),
+            ("TkHeadingFont", 10, "bold"),
+            ("TkMenuFont", 10, "normal"),
+            ("TkCaptionFont", 10, "normal"),
+        ):
+            try:
+                named_font = tkfont.nametofont(font_name)
+                named_font.configure(family=self.font_family, size=size, weight=weight)
+            except tk.TclError:
+                continue
+
+        self.root.option_add("*Font", f"{self.font_family} 10")
+        self.root.option_add("*TCombobox*Listbox.font", f"{self.font_family} 10")
+
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        style.configure(".", background=self.palette["app_bg"], foreground=self.palette["text"])
+        style.configure("App.TFrame", background=self.palette["app_bg"])
+        style.configure(
+            "Card.TFrame",
+            background=self.palette["card_bg"],
+            relief="solid",
+            borderwidth=1,
+            bordercolor=self.palette["border"],
+        )
+        style.configure(
+            "Card.TLabelframe",
+            background=self.palette["card_bg"],
+            relief="solid",
+            borderwidth=1,
+            bordercolor=self.palette["border"],
+            padding=14,
+        )
+        style.configure(
+            "Card.TLabelframe.Label",
+            background=self.palette["card_bg"],
+            foreground=self.palette["text"],
+            font=(self.font_family, 11, "bold"),
+        )
+        style.configure(
+            "Title.TLabel",
+            background=self.palette["app_bg"],
+            foreground=self.palette["text"],
+            font=(self.font_family, 20, "bold"),
+        )
+        style.configure(
+            "Subtitle.TLabel",
+            background=self.palette["app_bg"],
+            foreground=self.palette["muted"],
+            font=(self.font_family, 10),
+        )
+        style.configure(
+            "FieldLabel.TLabel",
+            background=self.palette["card_bg"],
+            foreground=self.palette["muted"],
+            font=(self.font_family, 10, "bold"),
+        )
+        style.configure(
+            "ValueLabel.TLabel",
+            background=self.palette["card_bg"],
+            foreground=self.palette["text"],
+            font=(self.font_family, 11, "bold"),
+        )
+        style.configure(
+            "SectionText.TLabel",
+            background=self.palette["card_bg"],
+            foreground=self.palette["muted"],
+            font=(self.font_family, 10),
+        )
+        style.configure("TButton", padding=(14, 10), font=(self.font_family, 10, "bold"))
+        style.configure(
+            "Primary.TButton",
+            background=self.palette["accent"],
+            foreground="#ffffff",
+            bordercolor=self.palette["accent"],
+        )
+        style.map(
+            "Primary.TButton",
+            background=[("active", self.palette["accent_hover"]), ("disabled", "#c7d2fe")],
+            foreground=[("disabled", "#f8fafc")],
+        )
+        style.configure(
+            "Secondary.TButton",
+            background="#f8fbff",
+            foreground=self.palette["text"],
+            bordercolor=self.palette["border"],
+        )
+        style.map(
+            "Secondary.TButton",
+            background=[("active", "#e8f1ff"), ("disabled", "#f1f5f9")],
+            foreground=[("disabled", "#94a3b8")],
+        )
+        style.configure(
+            "Danger.TButton",
+            background="#fee2e2",
+            foreground=self.palette["danger"],
+            bordercolor="#fecaca",
+        )
+        style.map(
+            "Danger.TButton",
+            background=[("active", "#fecaca"), ("disabled", "#fef2f2")],
+            foreground=[("disabled", "#fca5a5")],
+        )
+        style.configure(
+            "TEntry",
+            fieldbackground="#ffffff",
+            bordercolor=self.palette["border"],
+            lightcolor=self.palette["border"],
+            darkcolor=self.palette["border"],
+            padding=(10, 8),
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground="#ffffff",
+            bordercolor=self.palette["border"],
+            lightcolor=self.palette["border"],
+            darkcolor=self.palette["border"],
+            arrowsize=16,
+            padding=(8, 8),
+        )
+        style.configure(
+            "Treeview",
+            background="#ffffff",
+            fieldbackground="#ffffff",
+            foreground=self.palette["text"],
+            rowheight=30,
+            font=(self.font_family, 10),
+        )
+        style.configure(
+            "Treeview.Heading",
+            background="#e8eef8",
+            foreground=self.palette["text"],
+            font=(self.font_family, 10, "bold"),
+            relief="flat",
+            padding=(8, 8),
+        )
+        style.map("Treeview", background=[("selected", "#dbeafe")], foreground=[("selected", self.palette["text"])])
+        style.map("Treeview.Heading", background=[("active", "#dbeafe")])
+
     def create_widgets(self) -> None:
-        main_frame = ttk.Frame(self.root, padding=12)
+        main_frame = ttk.Frame(self.root, padding=18, style="App.TFrame")
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(4, weight=1)
+        main_frame.rowconfigure(5, weight=1)
+        main_frame.rowconfigure(6, weight=1)
 
-        status_frame = ttk.Frame(main_frame)
-        status_frame.grid(row=0, column=0, sticky="ew")
+        header_frame = ttk.Frame(main_frame, style="App.TFrame")
+        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        header_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(header_frame, text="UPnP ポート開放ツール", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            header_frame,
+            text="ルーター検出、ポート開放、既存マッピング確認を 1 画面で行えます。",
+            style="Subtitle.TLabel",
+        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+
+        status_frame = ttk.Frame(main_frame, padding=14, style="Card.TFrame")
+        status_frame.grid(row=1, column=0, sticky="ew", pady=(0, 12))
         status_frame.columnconfigure(0, weight=1)
 
-        self.status_label = ttk.Label(
+        self.status_label = tk.Label(
             status_frame,
             textvariable=self.status_var,
-            foreground="#1d4ed8",
-            font=("", 10, "bold"),
+            bg="#dbeafe",
+            fg=self.palette["accent"],
+            padx=14,
+            pady=8,
+            font=(self.font_family, 10, "bold"),
+            anchor="w",
         )
         self.status_label.grid(row=0, column=0, sticky="w")
 
         self.refresh_devices_btn = ttk.Button(
             status_frame,
-            text="ルーター再検索",
+            text="ルーターを再検索",
             command=self.start_discovery,
+            style="Secondary.TButton",
         )
         self.refresh_devices_btn.grid(row=0, column=1, sticky="e")
 
-        router_frame = ttk.LabelFrame(main_frame, text="ルーター情報", padding=10)
-        router_frame.grid(row=1, column=0, pady=(10, 8), sticky="ew")
+        router_frame = ttk.LabelFrame(main_frame, text="ルーター情報", style="Card.TLabelframe")
+        router_frame.grid(row=2, column=0, pady=(0, 12), sticky="ew")
         router_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(router_frame, text="対象ルーター").grid(row=0, column=0, sticky="w")
-        self.router_combo = ttk.Combobox(
-            router_frame,
-            textvariable=self.router_var,
-            state="disabled",
-        )
-        self.router_combo.grid(row=0, column=1, padx=6, pady=3, sticky="ew")
+        ttk.Label(router_frame, text="対象ルーター", style="FieldLabel.TLabel").grid(row=0, column=0, sticky="w")
+        self.router_combo = ttk.Combobox(router_frame, textvariable=self.router_var, state="disabled")
+        self.router_combo.grid(row=0, column=1, padx=(10, 0), pady=(0, 10), sticky="ew")
         self.router_combo.bind("<<ComboboxSelected>>", self.on_router_selected)
 
-        ttk.Label(router_frame, text="グローバル IP").grid(row=1, column=0, sticky="w")
-        self.external_ip_label = ttk.Label(router_frame, textvariable=self.external_ip_var)
-        self.external_ip_label.grid(row=1, column=1, padx=6, pady=3, sticky="w")
+        ttk.Label(router_frame, text="検出したサービス", style="FieldLabel.TLabel").grid(row=1, column=0, sticky="w")
+        ttk.Label(router_frame, textvariable=self.router_info_var, style="ValueLabel.TLabel").grid(
+            row=1,
+            column=1,
+            padx=(10, 0),
+            pady=(0, 10),
+            sticky="w",
+        )
 
-        config_frame = ttk.LabelFrame(main_frame, text="ポート設定", padding=10)
-        config_frame.grid(row=2, column=0, pady=8, sticky="ew")
+        ttk.Label(router_frame, text="グローバル IP", style="FieldLabel.TLabel").grid(row=2, column=0, sticky="w")
+        self.external_ip_label = ttk.Label(router_frame, textvariable=self.external_ip_var, style="ValueLabel.TLabel")
+        self.external_ip_label.grid(row=2, column=1, padx=(10, 0), sticky="w")
+
+        config_frame = ttk.LabelFrame(main_frame, text="ポート設定", style="Card.TLabelframe")
+        config_frame.grid(row=3, column=0, pady=(0, 12), sticky="ew")
         config_frame.columnconfigure(1, weight=1)
         config_frame.columnconfigure(3, weight=1)
 
-        ttk.Label(config_frame, text="外部ポート").grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            config_frame,
+            text="一覧から選んだ内容をそのまま反映できるので、追加も削除も迷いにくくしています。",
+            style="SectionText.TLabel",
+        ).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
+
+        ttk.Label(config_frame, text="外部ポート", style="FieldLabel.TLabel").grid(row=1, column=0, sticky="w")
         self.ext_port = ttk.Entry(config_frame)
         self.ext_port.insert(0, "8080")
-        self.ext_port.grid(row=0, column=1, padx=6, pady=3, sticky="ew")
+        self.ext_port.grid(row=1, column=1, padx=(10, 18), pady=(0, 10), sticky="ew")
 
-        ttk.Label(config_frame, text="内部ポート").grid(row=0, column=2, sticky="w")
+        ttk.Label(config_frame, text="内部ポート", style="FieldLabel.TLabel").grid(row=1, column=2, sticky="w")
         self.int_port = ttk.Entry(config_frame)
         self.int_port.insert(0, "8080")
-        self.int_port.grid(row=0, column=3, padx=6, pady=3, sticky="ew")
+        self.int_port.grid(row=1, column=3, padx=(10, 0), pady=(0, 10), sticky="ew")
 
-        ttk.Label(config_frame, text="プロトコル").grid(row=1, column=0, sticky="w")
+        ttk.Label(config_frame, text="プロトコル", style="FieldLabel.TLabel").grid(row=2, column=0, sticky="w")
         self.protocol = ttk.Combobox(config_frame, values=["TCP", "UDP"], state="readonly")
         self.protocol.current(0)
-        self.protocol.grid(row=1, column=1, padx=6, pady=3, sticky="ew")
+        self.protocol.grid(row=2, column=1, padx=(10, 18), pady=(0, 10), sticky="ew")
 
-        ttk.Label(config_frame, text="内部 IP").grid(row=1, column=2, sticky="w")
+        ttk.Label(config_frame, text="内部 IP", style="FieldLabel.TLabel").grid(row=2, column=2, sticky="w")
         self.local_ip = ttk.Entry(config_frame)
-        self.local_ip.grid(row=1, column=3, padx=6, pady=3, sticky="ew")
+        self.local_ip.grid(row=2, column=3, padx=(10, 0), pady=(0, 10), sticky="ew")
 
-        ttk.Label(config_frame, text="説明").grid(row=2, column=0, sticky="w")
+        ttk.Label(config_frame, text="説明", style="FieldLabel.TLabel").grid(row=3, column=0, sticky="w")
         self.desc = ttk.Entry(config_frame)
         self.desc.insert(0, "UPnP Tool")
-        self.desc.grid(row=2, column=1, columnspan=3, padx=6, pady=3, sticky="ew")
+        self.desc.grid(row=3, column=1, columnspan=3, padx=(10, 0), sticky="ew")
 
-        action_frame = ttk.Frame(main_frame)
-        action_frame.grid(row=3, column=0, pady=8, sticky="ew")
+        action_frame = ttk.Frame(main_frame, style="App.TFrame")
+        action_frame.grid(row=4, column=0, pady=(0, 12), sticky="ew")
+        action_frame.columnconfigure(0, weight=1)
+        action_frame.columnconfigure(1, weight=1)
+        action_frame.columnconfigure(2, weight=1)
 
         self.open_btn = ttk.Button(
             action_frame,
             text="ポートを開放 / 更新",
             command=self.start_add_mapping,
             state="disabled",
+            style="Primary.TButton",
         )
-        self.open_btn.pack(side=tk.LEFT, padx=(0, 6))
-
-        self.close_btn = ttk.Button(
-            action_frame,
-            text="フォーム内容で削除",
-            command=self.start_delete_mapping,
-            state="disabled",
-        )
-        self.close_btn.pack(side=tk.LEFT, padx=6)
+        self.open_btn.grid(row=0, column=0, padx=(0, 8), sticky="ew")
 
         self.refresh_mappings_btn = ttk.Button(
             action_frame,
             text="一覧を更新",
             command=self.start_refresh_mappings,
             state="disabled",
+            style="Secondary.TButton",
         )
-        self.refresh_mappings_btn.pack(side=tk.LEFT, padx=6)
+        self.refresh_mappings_btn.grid(row=0, column=1, padx=8, sticky="ew")
 
-        mapping_frame = ttk.LabelFrame(main_frame, text="現在のポートマッピング", padding=10)
-        mapping_frame.grid(row=4, column=0, pady=(8, 8), sticky="nsew")
+        self.close_btn = ttk.Button(
+            action_frame,
+            text="フォーム内容で削除",
+            command=self.start_delete_mapping,
+            state="disabled",
+            style="Danger.TButton",
+        )
+        self.close_btn.grid(row=0, column=2, padx=(8, 0), sticky="ew")
+
+        mapping_frame = ttk.LabelFrame(main_frame, text="現在のポートマッピング", style="Card.TLabelframe")
+        mapping_frame.grid(row=5, column=0, pady=(0, 12), sticky="nsew")
         mapping_frame.columnconfigure(0, weight=1)
-        mapping_frame.rowconfigure(0, weight=1)
+        mapping_frame.rowconfigure(1, weight=1)
+
+        ttk.Label(
+            mapping_frame,
+            text="一覧を選択するとフォームに反映されます。削除前の確認にも使えます。",
+            style="SectionText.TLabel",
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
         columns = ("ext", "proto", "client", "int", "enabled", "lease", "desc")
-        self.mapping_tree = ttk.Treeview(
-            mapping_frame,
-            columns=columns,
-            show="headings",
-            height=12,
-        )
+        self.mapping_tree = ttk.Treeview(mapping_frame, columns=columns, show="headings", height=12)
         self.mapping_tree.heading("ext", text="外部")
         self.mapping_tree.heading("proto", text="プロトコル")
         self.mapping_tree.heading("client", text="内部 IP")
@@ -148,34 +353,63 @@ class UPnPToolGUI:
         self.mapping_tree.heading("lease", text="リース")
         self.mapping_tree.heading("desc", text="説明")
 
-        self.mapping_tree.column("ext", width=80, anchor=tk.CENTER)
-        self.mapping_tree.column("proto", width=90, anchor=tk.CENTER)
-        self.mapping_tree.column("client", width=140, anchor=tk.CENTER)
-        self.mapping_tree.column("int", width=80, anchor=tk.CENTER)
-        self.mapping_tree.column("enabled", width=60, anchor=tk.CENTER)
-        self.mapping_tree.column("lease", width=80, anchor=tk.CENTER)
-        self.mapping_tree.column("desc", width=220, anchor=tk.W)
-        self.mapping_tree.grid(row=0, column=0, sticky="nsew")
+        self.mapping_tree.column("ext", width=90, anchor=tk.CENTER)
+        self.mapping_tree.column("proto", width=110, anchor=tk.CENTER)
+        self.mapping_tree.column("client", width=170, anchor=tk.CENTER)
+        self.mapping_tree.column("int", width=90, anchor=tk.CENTER)
+        self.mapping_tree.column("enabled", width=70, anchor=tk.CENTER)
+        self.mapping_tree.column("lease", width=90, anchor=tk.CENTER)
+        self.mapping_tree.column("desc", width=320, anchor=tk.W)
+        self.mapping_tree.grid(row=1, column=0, sticky="nsew")
         self.mapping_tree.bind("<<TreeviewSelect>>", self.on_mapping_selected)
 
-        tree_scroll = ttk.Scrollbar(mapping_frame, orient=tk.VERTICAL, command=self.mapping_tree.yview)
-        tree_scroll.grid(row=0, column=1, sticky="ns")
-        self.mapping_tree.configure(yscrollcommand=tree_scroll.set)
+        tree_y_scroll = ttk.Scrollbar(mapping_frame, orient=tk.VERTICAL, command=self.mapping_tree.yview)
+        tree_y_scroll.grid(row=1, column=1, sticky="ns")
+        tree_x_scroll = ttk.Scrollbar(mapping_frame, orient=tk.HORIZONTAL, command=self.mapping_tree.xview)
+        tree_x_scroll.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        self.mapping_tree.configure(yscrollcommand=tree_y_scroll.set, xscrollcommand=tree_x_scroll.set)
+
+        log_frame = ttk.LabelFrame(main_frame, text="ログ", style="Card.TLabelframe")
+        log_frame.grid(row=6, column=0, sticky="nsew")
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(1, weight=1)
+        main_frame.rowconfigure(6, weight=1)
+
+        log_header = ttk.Frame(log_frame, style="Card.TFrame")
+        log_header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        log_header.columnconfigure(0, weight=1)
 
         ttk.Label(
-            mapping_frame,
-            text="一覧を選ぶとフォームに反映されます。削除前の確認にも使えます。",
-        ).grid(row=1, column=0, columnspan=2, pady=(8, 0), sticky="w")
-
-        ttk.Label(main_frame, text="ログ").grid(row=5, column=0, sticky="w")
-        self.log_area = scrolledtext.ScrolledText(
-            main_frame,
-            height=10,
-            state="disabled",
-            font=("Consolas", 9),
+            log_header,
+            text="検出結果や失敗理由をここに表示します。",
+            style="SectionText.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Button(log_header, text="ログをクリア", command=self.clear_log, style="Secondary.TButton").grid(
+            row=0,
+            column=1,
+            sticky="e",
         )
-        self.log_area.grid(row=6, column=0, sticky="nsew")
-        main_frame.rowconfigure(6, weight=1)
+
+        self.log_area = scrolledtext.ScrolledText(
+            log_frame,
+            height=8,
+            state="disabled",
+            wrap=tk.WORD,
+            bg=self.palette["log_bg"],
+            fg=self.palette["log_fg"],
+            insertbackground="#ffffff",
+            relief="flat",
+            borderwidth=0,
+            padx=12,
+            pady=12,
+            font=("Consolas", 10),
+        )
+        self.log_area.grid(row=1, column=0, sticky="nsew")
+
+    def clear_log(self) -> None:
+        self.log_area.configure(state="normal")
+        self.log_area.delete("1.0", tk.END)
+        self.log_area.configure(state="disabled")
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy
@@ -198,14 +432,27 @@ class UPnPToolGUI:
             self.router_combo.config(state="readonly")
 
     def set_status(self, text: str, color: str = "#1d4ed8") -> None:
+        status_backgrounds = {
+            "#2563eb": "#dbeafe",
+            "#1d4ed8": "#dbeafe",
+            "#15803d": "#dcfce7",
+            "#b91c1c": "#fee2e2",
+        }
+
         def apply() -> None:
             self.status_var.set(text)
-            self.status_label.config(foreground=color)
+            self.status_label.config(
+                foreground=color,
+                background=status_backgrounds.get(color, "#e2e8f0"),
+            )
 
         self.root.after(0, apply)
 
     def set_external_ip(self, value: str) -> None:
         self.root.after(0, lambda: self.external_ip_var.set(value))
+
+    def set_router_info(self, value: str) -> None:
+        self.root.after(0, lambda: self.router_info_var.set(value))
 
     def log(self, message: str) -> None:
         self.root.after(0, self._append_log, message)
@@ -246,7 +493,8 @@ class UPnPToolGUI:
         self.start_worker(self.discover_devices)
 
     def discover_devices(self) -> None:
-        self.set_status("UPnP デバイスを検索中...", "#1d4ed8")
+        self.set_status("UPnP デバイスを検索中...", "#2563eb")
+        self.set_router_info("検索中")
         self.log("UPnP デバイスの検索を開始しました。")
 
         try:
@@ -258,6 +506,7 @@ class UPnPToolGUI:
             self.update_router_candidates([])
             self.clear_mappings()
             self.set_external_ip("未取得")
+            self.set_router_info("検索失敗")
             self.set_status("デバイス検索に失敗しました", "#b91c1c")
             self.log(f"検索エラー: {exc}")
             return
@@ -271,6 +520,7 @@ class UPnPToolGUI:
             self.device = None
             self.clear_mappings()
             self.set_external_ip("未取得")
+            self.set_router_info("対応サービスなし")
             self.set_status("対応する UPnP ルーターが見つかりません", "#b91c1c")
             self.log("ポートマッピングに使える WANIP/WANPPP サービスが見つかりませんでした。")
             return
@@ -348,7 +598,8 @@ class UPnPToolGUI:
         self.service = candidate["service"]
 
         friendly_name = getattr(self.device, "friendly_name", "Unknown device")
-        self.set_status(f"接続中: {friendly_name}", "#1d4ed8")
+        self.set_status(f"接続中: {friendly_name}", "#2563eb")
+        self.set_router_info(candidate["label"])
         self.log(f"ルーターを選択しました: {candidate['label']}")
 
         external_ip = "取得失敗"
